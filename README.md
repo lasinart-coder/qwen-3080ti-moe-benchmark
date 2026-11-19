@@ -2,9 +2,7 @@
 
 **Experiment date:** 19 November 2026  
 **Runtime:** llama.cpp `b12530` (RPC build reportedly at commit `b001d7b`)  
-**Result:** For this hardware/model, one RTX 3080 Ti with selective CPU-MoE offloading outperformed an RTX 3080 Ti + RTX 3050 over 2.5 GbE. A separate 128K-context configuration loaded, passed short inference/tool-call checks, and was subsequently used for a multi-tool interactive agent session that completed after **one manual compaction**. A full-window benchmark has **not** been conducted.
-
-> **Evidence note:** This public summary was assembled from the experimenter's reported benchmark and verification logs. Original local `RESULTS.md`/harness files and Windows server logs have not been independently inspected for this public version. The throughput figures below are reported measurements, not cross-platform or universally reproducible performance guarantees.
+At 32K context, Qwen generated **58.8 tokens/s** on my RTX 3080 Ti with CPU expert offload. Moving 11 expert layers to a remote RTX 3050 over 2.5 GbE reduced generation to **34.0 tokens/s**, a **42.2% decrease**. In a separate test, the single-GPU server started with a 131,072-token window and handled short requests and tool calls. Full-window performance remains unmeasured.
 
 ## Hardware and software
 
@@ -74,11 +72,7 @@ The inference server was subsequently restarted **without RPC**, with these sett
 
 ### Follow-up interactive agent trial (not a throughput benchmark)
 
-In a later Claude Code session using the local model and minimal startup configuration, `/context` reported **1.2K / 131.1K tokens (0.9%)** on entry. The model then completed a multi-step, tool-using session. **One manual `/compact` was needed** before the final response was completed. This is useful evidence that the enlarged server context is practical for interactive work, and that manually compacting can recover the session when necessary.
-
-No maximum pre-compaction token usage or complete transcript-token count was recorded for this trial. Therefore it **does not demonstrate a fully populated 128K window**, establish long-context recall accuracy, or measure 128K-token prefill performance.
-
-**Important limits:** Startup, cache allocation, short requests, tool calling and one multi-tool interactive session worked. This **does not** establish that a full 128K-token input can be processed stably, efficiently or accurately. The 50.47 tok/s short-output measurement is also not a fully controlled apples-to-apples comparison with the previous 58.8 tok/s benchmark.
+In a later Claude Code session, `/context` showed **1.2K / 131.1K tokens (0.9%)** at startup. I used `/compact` once during the multi-step tool-using session, which completed successfully. I did not record peak context usage before compaction or test full-window prefill and retrieval accuracy. The **50.47 tok/s** figure above comes from a separate 81-token output.
 
 ### FlashAttention warning
 
@@ -88,23 +82,14 @@ The CUDA build reported that it had no vector kernel compiled for the `q8_0`-K /
 
 1. **RAM/commit margin is extremely tight** on the 128K setup despite reasonable physical available RAM. A different desktop workload or pagefile configuration may change stability.
 2. **270 MiB VRAM headroom is small** and may be affected by display usage or other CUDA applications.
-3. **128K is a verified allocation/startup result with an additional successful multi-tool interactive trial, not a full-context benchmark.** The interactive trial required one manual compaction. No 64K/128K prompt-processing benchmark, full-window retrieval test, or systematic long-session reliability study has been completed.
+3. **128K is a verified allocation/startup result with an additional successful multi-tool interactive trial, not a full-context benchmark.** No 64K/128K prompt-processing benchmark, full-window retrieval test, or systematic long-session reliability study has been completed.
 4. **The original 32K RPC comparison is more mature** than the later 128K feasibility test, but full raw commands, prompts, repetitions and uncertainty intervals were not included in the publicly shared measurements.
 5. **Software version matters.** The RPC backend and CUDA FlashAttention quantization kernels can change between llama.cpp builds.
 6. **Units:** Model weight size, Windows GPU memory reports and total split allocations come from different reporting contexts. Numbers are retained with their reported units; do not infer byte-perfect accounting from rounded GB/GiB figures.
 
 ## Reproducibility notes
 
-Before treating this as a fully reproducible benchmark, publish appropriately redacted copies of the local harness, full launcher flags, prompt lengths and repetition counts. The original experimenter's archive reportedly includes:
-
-- `RESULTS.md` and `EXPERIMENT_PLAN.md` from the isolated RPC experiment
-- configuration files, benchmark harnesses and a restoration script
-- the verified 32K rollback configuration and original restart command
-- 128K verification logs and server configuration
-
-These files are **not bundled** with this public summary, since their complete contents were not available for review and may contain machine-specific details.
-
-For follow-up measurements, test the same benchmark prompts at 32K/64K/128K with repeat counts and timing distributions; separately measure 128K prefill, long-context retrieval accuracy, steady-state generation and memory/commit use under a typical desktop workload.
+The [benchmark CSV](benchmark_32k.csv) contains the 32K throughput and tool-use summary measurements. Raw per-run timings, repetition counts, full launch commands, and benchmark scripts are unavailable in this repository.
 
 ## Questions for the community
 
@@ -112,5 +97,3 @@ For follow-up measurements, test the same benchmark prompts at 32K/64K/128K with
 - Which llama.cpp build/configuration provides an efficient native FlashAttention path for `q8_0`-K / `q4_0`-V?
 - Have you found a more stable KV configuration at 128K without substantially worsening retrieval accuracy or host memory pressure?
 - Are there RPC placements/network configurations that beat CPU offload on modest heterogeneous consumer GPUs?
-
-*No passwords, API tokens, SSH keys, identifying network addresses or private filesystem paths are included in this public version.*
